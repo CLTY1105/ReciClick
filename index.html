@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>ReciClick</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; background: #e6f5e9; color:#18381d; }
+
+    /* Paneles */
+    #menu, #instrArrastre, #instrVF, #juegoArrastre, #juegoVF, #gameOver, #gameOverVF { display: none; }
+    .overlay {
+      position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;
+      padding: 24px; z-index: 20;
+    }
+
+    /* Fondo del menú */
+    #menu {
+      background: url("https://avicultores.com/wp-content/uploads/2020/06/shutterstock_1310886638-scaled.jpg") no-repeat center center/cover;
+      color: white;
+    }
+    #menu h1 { font-size: 40px; margin-bottom: 20px; text-shadow: 2px 2px 4px #000; }
+    #menu .menu-buttons { display:flex; gap:16px; flex-wrap:wrap; justify-content:center; }
+
+    button {
+      padding: 12px 20px; border: 0; border-radius: 10px; background: #2b7a0b; color: #fff;
+      font-size: 16px; cursor: pointer;
+    }
+    button:hover { background: #246608; }
+
+    /* Contenedores de juego */
+    #contenedor, #contenedorVF { max-width: 960px; margin: auto; text-align: center; padding: 20px; background: rgba(255,255,255,0.92); border-radius: 10px; }
+
+    #puntos, #puntosVF { font-size: 20px; margin: 10px 0; }
+
+    /* Objeto */
+    #objeto { margin: 20px auto; border: 2px solid #1e3d24; background: #fff; border-radius: 12px; width: 260px; padding: 15px; }
+    #objeto img { width: 120px; height: 120px; display: block; margin: auto; }
+    .canecas { display: flex; justify-content: center; flex-wrap: wrap; gap: 20px; margin-top: 20px; }
+    .caneca { width: 170px; background: #f6fff7; padding: 10px; border-radius: 12px; text-align: center; border: 2px dashed transparent; transition: .12s; cursor:pointer; }
+    .caneca img { width: 150px; height: 180px; pointer-events: none; }
+    .caneca:hover { border-color: #2b7a0b; background: #dff6e4; }
+
+    /* Verdadero/Falso */
+    #objetoVF img { width: 120px; height: 120px; display: block; margin: auto; }
+    #afirmacion { font-size: 18px; margin: 15px 0; }
+
+    /* Instrucciones box */
+    .instr-box { max-width: 720px; background: rgba(255,255,255,0.96); padding: 18px; border-radius: 12px; border: 2px solid #cfe6d1; color: #15381c; }
+
+    /* GameOver overlays */
+    .gameover-box { background: #fff; padding: 20px; border-radius: 12px; border: 2px solid #cfe6d1; text-align:center; }
+
+    /* Confeti (canvas) */
+    #confetti-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+  </style>
+</head>
+<body>
+
+  <!-- MENÚ PRINCIPAL -->
+  <div id="menu" class="overlay" style="display:flex;">
+    <div class="instr-box" style="text-align:center;">
+      <h1>♻️ ReciClick</h1>
+      <p>Selecciona el juego que quieras jugar. Usa las instrucciones para aprender cómo funciona cada uno.</p>
+      <div class="menu-buttons">
+        <button onclick="mostrar('instrArrastre')">Clasificación por selección</button>
+        <button onclick="mostrar('instrVF')">Verdadero o Falso</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSTRUCCIONES SELECCIÓN -->
+  <div id="instrArrastre" class="overlay" style="display:none;">
+    <div class="instr-box">
+      <h2>Instrucciones — Clasificación</h2>
+      <ul style="text-align:left;">
+        <li>Se mostrará un residuo en pantalla.</li>
+        <li>Haz clic en la <b>caneca</b> donde creas que debe ir.</li>
+        <li>Si aciertas ➜ ganas 1 punto y aparece confeti.</li>
+        <li>Si fallas ➜ se muestra la pantalla de derrota con la caneca correcta.</li>
+      </ul>
+      <div style="margin-top:12px; display:flex; gap:10px; justify-content:center;">
+        <button onclick="iniciarJuego()">Iniciar Clasificación</button>
+        <button onclick="volverMenu()">Volver al menú</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INSTRUCCIONES VERDADERO/FALSO -->
+  <div id="instrVF" class="overlay" style="display:none;">
+    <div class="instr-box">
+      <h2>Instrucciones — Verdadero o Falso</h2>
+      <ul style="text-align:left;">
+        <li>Se mostrará un residuo y una afirmación.</li>
+        <li>Pulsa <b>Verdadero</b> si crees que la afirmación es correcta; pulsa <b>Falso</b> si es incorrecta.</li>
+        <li>Si aciertas ➜ +1 punto y confeti; continúa con otra afirmación.</li>
+        <li>Si fallas ➜ pantalla de derrota con la respuesta correcta.</li>
+      </ul>
+      <div style="margin-top:12px; display:flex; gap:10px; justify-content:center;">
+        <button onclick="iniciarVF()">Iniciar Verdadero/Falso</button>
+        <button onclick="volverMenu()">Volver al menú</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JUEGO 1: SELECCIÓN -->
+  <div id="juegoArrastre">
+    <div id="contenedor">
+      <h2 id="puntos">Puntos: 0</h2>
+
+      <div id="objeto">
+        <img src="" id="objetoImg" alt="Residuo">
+        <p id="objetoNombre"></p>
+      </div>
+
+      <div class="canecas">
+        <div class="caneca" data-caneca="blanco">
+          <img src="https://www.asoeconaturaleza.com/wp-content/uploads/2022/03/Caneca-Blanca.png" alt="Caneca blanca">
+          <p>Blanco</p>
+        </div>
+        <div class="caneca" data-caneca="verde">
+          <img src="https://estra.vtexassets.com/arquivos/ids/157525-800-auto?v=637755546193770000&width=800" alt="Caneca verde">
+          <p>Verde</p>
+        </div>
+        <div class="caneca" data-caneca="negro">
+          <img src="https://exitocol.vtexassets.com/arquivos/ids/21717020/caneca-de-reciclaje-20l-con-autoenganche-plastica-negra-pedal.jpg" alt="Caneca negra">
+          <p>Negro</p>
+        </div>
+      </div>
+
+      <div id="mensaje" style="min-height:24px; margin-top:12px;"></div>
+
+      <div style="margin-top:14px;">
+        <button onclick="volverMenu()">🔙 Volver al menú</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JUEGO 2: VERDADERO O FALSO -->
+  <div id="juegoVF">
+    <div id="contenedorVF">
+      <h2 id="puntosVF">Puntos: 0</h2>
+
+      <div id="objetoVF">
+        <img src="" id="objetoVFImg" alt="Residuo VF">
+        <p id="objetoVFNombre" style="font-weight:bold;"></p>
+      </div>
+
+      <p id="afirmacion"></p>
+      <div style="display:flex; gap:12px; justify-content:center; margin-top:6px;">
+        <button onclick="responder(true)">Verdadero ✅</button>
+        <button onclick="responder(false)">Falso ❌</button>
+      </div>
+
+      <div id="mensajeVF" style="min-height:24px; margin-top:12px;"></div>
+
+      <div style="margin-top:14px;">
+        <button onclick="volverMenu()">🔙 Volver al menú</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANTALLA DERROTA SELECCIÓN -->
+  <div id="gameOver" class="overlay">
+    <div class="gameover-box">
+      <h1>❌ Perdiste</h1>
+      <p id="textoPerdiste"></p>
+      <div style="margin-top:12px;">
+        <button onclick="volverMenu()">Volver al menú</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANTALLA DERROTA VERDADERO/FALSO -->
+  <div id="gameOverVF" class="overlay">
+    <div class="gameover-box">
+      <h1>❌ Perdiste</h1>
+      <p id="textoPerdisteVF"></p>
+      <div style="margin-top:12px;">
+        <button onclick="volverMenu()">Volver al menú</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confeti -->
+  <canvas id="confetti-canvas"></canvas>
+
+  <script>
+    /* ---------- Datos ---------- */
+    const objetos = [
+      { nombre: "Botella plástica", caneca: "blanco", img: "https://img.freepik.com/psd-gratis/botella-agua-plastico-transparente_632498-25872.jpg?semt=ais_hybrid&w=740&q=80" },
+      { nombre: "Cáscara de banano", caneca: "verde", img: "https://w7.pngwing.com/pngs/831/772/png-transparent-banana-peel-banana-food-poster-fruit.png" },
+      { nombre: "Papel", caneca: "blanco", img: "https://static.vecteezy.com/system/resources/thumbnails/048/712/053/small_2x/crumpled-paper-ball-transparent-background-free-png.png" },
+      { nombre: "Restos de comida", caneca: "verde", img: "https://cdn-icons-png.flaticon.com/512/2921/2921822.png" },
+      { nombre: "Bolsa plástica sucia", caneca: "negro", img: "https://th.bing.com/th/id/R.6d89c6abab8201da11642c81a61b10aa?rik=HgMoMvfl5B4gOA&pid=ImgRaw&r=0" }
+    ];
+
+    /* ---------- Helpers ---------- */
+    function mostrar(id) {
+      ["menu","instrArrastre","instrVF","juegoArrastre","juegoVF","gameOver","gameOverVF"].forEach(el=>{
+        document.getElementById(el).style.display="none";
+      });
+      const node=document.getElementById(id);
+      if(["menu","instrArrastre","instrVF","gameOver","gameOverVF"].includes(id)) node.style.display="flex";
+      else node.style.display="block";
+      document.getElementById("mensaje").textContent="";
+      document.getElementById("mensajeVF").textContent="";
+    }
+    function volverMenu(){ mostrar("menu"); }
+
+    /* ----------------- JUEGO SELECCIÓN ----------------- */
+    let puntosArrastre=0, objetoActual=null;
+    function iniciarJuego(){ puntosArrastre=0; actualizarPuntosArrastre(); mostrar("juegoArrastre"); nuevoObjeto(); }
+    function actualizarPuntosArrastre(){ document.getElementById("puntos").textContent="Puntos: "+puntosArrastre; }
+    function nuevoObjeto(){
+      objetoActual=objetos[Math.floor(Math.random()*objetos.length)];
+      document.getElementById("objetoImg").src=objetoActual.img;
+      document.getElementById("objetoNombre").textContent=objetoActual.nombre;
+    }
+    function verificarSeleccion(caneca){
+      if(caneca===objetoActual.caneca){
+        puntosArrastre++; actualizarPuntosArrastre();
+        document.getElementById("mensaje").style.color="green";
+        document.getElementById("mensaje").textContent="✅ ¡Correcto!";
+        lanzarConfeti();
+        setTimeout(nuevoObjeto,500);
+      }else{
+        document.getElementById("textoPerdiste").textContent=`${objetoActual.nombre} iba en la caneca ${objetoActual.caneca}.`;
+        mostrar("gameOver");
+      }
+    }
+    document.querySelectorAll(".caneca").forEach(c=>{
+      c.addEventListener("click",()=>verificarSeleccion(c.dataset.caneca));
+    });
+
+    /* ----------------- JUEGO VF ----------------- */
+    let puntosVF=0,objetoVF=null,afirmacionCorrecta=false;
+    function iniciarVF(){ puntosVF=0; actualizarPuntosVF(); mostrar("juegoVF"); nuevaPregunta(); }
+    function actualizarPuntosVF(){ document.getElementById("puntosVF").textContent="Puntos: "+puntosVF; }
+    function nuevaPregunta(){
+      objetoVF=objetos[Math.floor(Math.random()*objetos.length)];
+      document.getElementById("objetoVFImg").src=objetoVF.img;
+      document.getElementById("objetoVFNombre").textContent=objetoVF.nombre;
+      const esCorrecta=Math.random()<0.5;
+      let canecaAfirmada=esCorrecta?objetoVF.caneca:["blanco","verde","negro"].filter(c=>c!==objetoVF.caneca)[Math.floor(Math.random()*2)];
+      afirmacionCorrecta=(canecaAfirmada===objetoVF.caneca);
+      document.getElementById("afirmacion").textContent=`${objetoVF.nombre} va en la caneca ${canecaAfirmada}.`;
+    }
+    function responder(elegida){
+      if(elegida===afirmacionCorrecta){
+        puntosVF++; actualizarPuntosVF();
+        document.getElementById("mensajeVF").style.color="green";
+        document.getElementById("mensajeVF").textContent="✅ ¡Correcto!";
+        lanzarConfeti(); setTimeout(nuevaPregunta,500);
+      }else{
+        document.getElementById("textoPerdisteVF").textContent=`${objetoVF.nombre} va en la caneca ${objetoVF.caneca}.`;
+        mostrar("gameOverVF");
+      }
+    }
+
+    /* ----------------- CONFETI ----------------- */
+    const canvas=document.getElementById("confetti-canvas"),ctx=canvas.getContext("2d");
+    function redimensionar(){canvas.width=innerWidth;canvas.height=innerHeight;}
+    addEventListener("resize",redimensionar);redimensionar();
+    const confettis=[];function crearConfeti(x,y){return{x,y,color:`hsl(${Math.random()*360},100%,50%)`,size:Math.random()*8+4,sx:Math.random()*4-2,sy:Math.random()*-5-2,g:0.2};}
+    function lanzarConfeti(){for(let i=0;i<40;i++)confettis.push(crearConfeti(innerWidth/2,innerHeight/2));}
+    function animarConfeti(){ctx.clearRect(0,0,canvas.width,canvas.height);for(let i=confettis.length-1;i>=0;i--){const c=confettis[i];c.x+=c.sx;c.y+=c.sy;c.sy+=c.g;ctx.fillStyle=c.color;ctx.fillRect(c.x,c.y,c.size,c.size);if(c.y>canvas.height)confettis.splice(i,1);}requestAnimationFrame(animarConfeti);}animarConfeti();
+
+    mostrar("menu");
+  </script>
+</body>
+</html>
